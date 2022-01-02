@@ -1,7 +1,7 @@
 # Virtual enviroment olusturuyoruz. Sonra activate ediyoruz 
 py -m venv benv 
 source ./env/Scripts/activate
-# Django yüklenir.  
+# Django yüklüyoruz.  
 pip install django
 # Sonrasinda decouple ve pillow yüklenir. Djangoda img kullanmak icin pillow kütüphanesi yüklenir.
 pip install python-decouple
@@ -54,7 +54,7 @@ urlpatterns = [
 # Simdi nasil modellerimiz olacak yazalim. Category ve Post modellerimiz olacak. Bunlarin icinde bazi fields ler olacak. Comment ve like tablolarimiz olacak.
 
 
-# Djangonun boze otomatik verdigi bir user modeli var.Öncelikle ondanbahsedelim. 
+# Djangonun boze otomatik verdigi bir user modeli var. Öncelikle ondan bahsedelim. 
 Django Default User Model Fields
 Here is the list of default Django user fields.
 
@@ -162,7 +162,7 @@ image = models.ImageField(upload_to=user_directory_path, default='django.jpg')
 # signals.py
 # post etmeden önce bana slug olustur demek pre_save methodu
 from django.db.models.signals import pre_save 
-# kaydete bastiktan sonra önce ben bi islem yapacam onu yaptiktan sonra kaydet demek yani dispatcherin recevir fonksiyonu
+# kaydete bastiktan sonra önce ben bi islem yapacam onu yaptiktan sonra kaydet demek yani dispatcherin recevir fonksiyonu. Mesela herhangi bir blog u sildikten sonra ona ait fotolari da sil.
 from django.dispatch import receiver
 # araya tire koyan bir fonksiyon var slugify, methodun icerisine koydugum stringleri arasina bosluk koyuyor yaptigi islem bu aslinda.
 from django.template.defaultfilters import slugify
@@ -178,4 +178,167 @@ a = 'hilmi sarioglu'
 print(slugify(a))
 # hilmi-sarioglu ciktisini verir
 # ----------------------------------------------------------------
-1.18
+
+# models.py a PostView , Comment ve Like  adinda class yaziyoruz ve admin panele geciriyoruz
+class Comment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comment")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+    content = models.TextField()
+    
+    def __str__(self):
+        return self.user.username
+
+class Like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.username
+
+# Post u kac kisi görüntülemis bunu tutmak icin
+class PostView(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.user.username
+# --------------------------------------------------------------
+from django.contrib import admin
+from .models import  Post, Comment, Like, PostView, Category
+
+admin.site.register(Category)
+admin.site.register(Post)
+admin.site.register(Comment)
+admin.site.register(PostView)
+admin.site.register(Like)
+# --------------------------------------------------------------
+# forms.py olusturuyoruz. Benim 2 tane forma ihtiyacim var. PostForm ve CommentForm. PostFormu edit islemleri yaparken de kullanacagiz. Digerini de yorum icin olusturacagiz. 
+from django import forms
+from .models import Post, Comment, Category
+
+class PostForm(forms.ModelForm):
+# Postun icindeki options lari dogrudan burada da kullanabiliriz
+    status = forms.ChoiceField(choices=Post.OPTIONS)
+# Category tableinda db de eklendikce buraya da dropdown olarak eklenir.ModelChoiceField araciligi ile, Bos iken ise Select yazacak.
+    category = forms.ModelChoiceField(queryset=Category.objects.all(), empty_label="Select" )
+    class Meta:
+        model = Post
+        fields = (
+            'title',
+            'content',
+            'image',
+            'category',
+            'status',
+        )
+        
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = Comment
+        fields = ('content',)
+# ----------------------------------------------------------------
+# Simdi views yazmaya baslayalim. Her view yazildiktan sonra template yazilir ve entegreli bir sekilde devam edilir.
+
+from django.shortcuts import render
+
+def post_list(request):
+    qs = Post.objects.filter(status='p')
+    context = {
+        'object_list' : qs
+    }
+    return render (request, "blog/post_list.html", context )
+# Bu benim base templates im olacak. Bunun icerisine diger templatesler koyulacak. BaseTemplates icin settings e gidilir.
+TEMPLATES = [
+    {
+        'DIRS': [BASE_DIR, "templates"],
+]
+# Daha sonra templates klasörü altinda base.html olusturulur.
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    {% block content %}{% endblock %}
+  </body>
+</html>
+
+# -------------------------------------------------------------  
+# templates/blog/post_list.html
+{% extends 'base.html' %}
+
+{% block content %}
+{% for object in object_list %}
+<h1>{{object.title}}</h1>
+<img src="{{object.image.url}}" alt="">
+
+# 20 karakter göstersin sonuna da 3 nokta koyar
+<p>{{object.content | truncatechars:20}}</p>
+{{ endfor }}
+{% endblock content %}
+
+
+# simdi url ye isleyelim
+from django.urls import path
+from .views import post_list
+
+app_name = "blog" 
+urlpatterns = [
+    path("",post_list, name="list"),
+]
+# -------------------------------------------------------------
+# views yazmaya devam edelim
+from .forms import PostForm
+def post_create(request):
+    # form = PostForm(request.POST or None, request.FILES or None)
+    form = PostForm()
+    if request.method == "POST":
+        form = PostForm(request.POST, request.FILES)
+        # print(request.FILES)
+        if form.is_valid():
+
+# author u database e söylemem lazim bunu kim yaziyor diye. commit = False demek datayi sen kaydet ama daha database e isleme, ben bir sey ekleyecegim bu post a demek. 
+            post = form.save(commit=False)
+# burda da author u user a esitledik. Burada author u doldurduk. Yani kullaniciya author bölümün doldurtmadik onun yerine yolda bunu ben ekledim. Bu cok kullanilan bir yapi. Eger bu bölümü es gecersek bize hata verir. Post has no author hatasi aliriz.
+            post.author = request.user
+            post.save()
+            messages.success(request, "Post created successfully!")
+# app_name diye bir sey yazdik, djangonun kafas karismasin diye, list e redirect yapacak ama hangi list e ? Blog altindaki list.
+            return redirect("blog:list")
+    context = {
+        'form' : form
+    }
+    return render (request, "blog/post_create.html", context)
+
+# hemen urls e ekliyoruz
+from django.urls import path
+from .views import post_list, post_create
+
+app_name = "blog" 
+urlpatterns = [
+    path("",post_list, name="list"),
+    path("create/",post_create, name="create"),
+]
+
+# templates/blog/post_create.html olusturalim. 
+{% extends 'base.html' %} {% load crispy_forms_tags %} {% block content %}
+<div class="row">
+  <div class="col-md-6 offset-md-3">
+    <h3>Blog Post</h3>
+    <hr />
+    <form method="POST" enctype="multipart/form-data">   
+      {% csrf_token %} {{form|crispy}}
+      <br />
+      <button type="submit" class="btn btn-outline-info">Post</button>
+    </form>
+  </div>
+</div>
+
+{% endblock content %}
+# -------------------------------------------------------------
+
+
