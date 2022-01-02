@@ -8,4 +8,4 @@ from .utils import get_random_code
 def pre_save_create_slug(sender, instance, **kwargs):
     if not instance.slug:
         instance.slug = slugify(instance.title + " " + get_random_code())
-        
+

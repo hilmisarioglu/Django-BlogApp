@@ -3,7 +3,7 @@ py -m venv benv
 source ./env/Scripts/activate
 # Django yüklenir.  
 pip install django
-# Sonrasinda decouple ve pillow yüklenir. 
+# Sonrasinda decouple ve pillow yüklenir. Djangoda img kullanmak icin pillow kütüphanesi yüklenir.
 pip install python-decouple
 pip install pillow
 # Eger kullanilacaksa crispy forms yüklenir. 
@@ -84,9 +84,11 @@ def user_directory_path(instance, filename):
 class Category(models.Model):
     name = models.CharField(max_length=100)
     
+# Categorys yerine DB de Categories gözükecek
     class Meta:
         verbose_name_plural = "Categories"
         
+# db de nasil gözüksün onu gösterir
     def __str__(self):
         return self.name
 
@@ -115,49 +117,65 @@ class Post(models.Model):
 # draft-published field i olacak. Eger yazar blogun ana sayfada yayinlanmasini istemiyorsa drafti sececek. 
     status = models.CharField(max_length=10, choices=OPTIONS, default='d')
 
-# Bir "slug", genellikle önceden elde edilmiş verileri kullanarak geçerli bir URL oluşturmanın bir yoludur. Örneğin, bir bilgi, bir URL oluşturmak için bir makalenin başlığını kullanır. Slug'u manuel olarak ayarlamak yerine, başlık (veya başka bir veri parçası) verilen bir işlev aracılığıyla oluşturmanızı tavsiye ederim.Aralara - koyarak URL olusturur. slug how-to-learn-django
+# Bir "slug", genellikle önceden elde edilmiş verileri kullanarak geçerli bir URL oluşturmanın bir yoludur. Örneğin, bir bilgi, bir URL oluşturmak için bir makalenin başlığını kullanır. Slug'u manuel olarak ayarlamak yerine, başlık (veya başka bir veri parçası) verilen bir işlev aracılığıyla oluşturmanızı tavsiye ederim.Aralara - koyarak URL olusturur. slug how-to-learn-django-7636fgseze2 gibi
     slug = models.SlugField(blank=True)
+# ----------------------------------------------------------------
+# admin.py yazalim.
+from django.contrib import admin
+from .models import  Post, Category
 
-    def __str__(self):
-        return self.title
-    
-    
-    
-    def comment_count(self):
-        return self.comment_set.all().count()
-    
-    def view_count(self):
-        return self.postview_set.all().count()
-    
-    def like_count(self):
-        return self.like_set.all().count()
-    
-    def comments(self):
-        return self.comment_set.all()
+admin.site.register(Category)
+admin.site.register(Post)
+# ----------------------------------------------------------------
+# fotolari media_root isminde bir directiry ac ve altina kaydet demek.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / "media_root"
 
-class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comment")
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    time_stamp = models.DateTimeField(auto_now_add=True)
-    content = models.TextField()
-    
-    def __str__(self):
-        return self.user.username
-    
-class Like(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+# ana projedeki urls.pyy a git ve bir kac ayar var onlari yap.
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
-    def __str__(self):
-        return self.user.username
-    
-class PostView(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    time_stamp = models.DateTimeField(auto_now_add=True)
-    
-    def __str__(self):
-        return self.user.username
-    
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('blog.urls')),
+    path('users/', include('users.urls')),
+]
 
+# gelistirme asamasindayken media file larimi benim gösterdigim klasör altina koy, production asamasina geldigimizde ben baska bir yol verecem demek. media_root isminde bir klasör olustur.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+# modelde bir fonksiyon belirle, upload_to ile de bu fonksiyonu cagir. media_root un altina blog isminde klasör acacak, onun da altina yazarin id numarasinin oldugu bir klasör acacak , onun da altina dosya isimlerini yazacak.Otomatik olarak kendi olusturacak.
+def user_directory_path(instance, filename):
+    return 'blog/{0}/{1}'.format(instance.author.id, filename)
+
+image = models.ImageField(upload_to=user_directory_path, default='django.jpg')  
+# ----------------------------------------------------------------
+# signals.py dan bahsedelim. Bir post olusturulmadan önce prepost veya olusturuldak sonra postsave , postdelete vs ne yapmak istiyorsak bunlari signals dosyasi altina yazariz. 
+
+# apps.py 
+    def ready(self):
+        import blog.signals
+
+# signals.py
+# post etmeden önce bana slug olustur demek pre_save methodu
+from django.db.models.signals import pre_save 
+# kaydete bastiktan sonra önce ben bi islem yapacam onu yaptiktan sonra kaydet demek yani dispatcherin recevir fonksiyonu
+from django.dispatch import receiver
+# araya tire koyan bir fonksiyon var slugify, methodun icerisine koydugum stringleri arasina bosluk koyuyor yaptigi islem bu aslinda.
+from django.template.defaultfilters import slugify
+from .models import Post
+# sonuna rastgele 8 basamakli ifade koyar
+from .utils import get_random_code
+
+@receiver(pre_save, sender=Post)
+def pre_save_create_slug(sender, instance, **kwargs):
+    if not instance.slug:
+        instance.slug = slugify(instance.title + " " + get_random_code())
+a = 'hilmi sarioglu'
+print(slugify(a))
+# hilmi-sarioglu ciktisini verir
+# ----------------------------------------------------------------
+1.18
