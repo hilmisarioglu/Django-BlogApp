@@ -4,6 +4,11 @@ from .forms import PostForm, CommentForm
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
+def homepage(request):
+    return render(request, 'blog/homepage.html')
+def about(request):
+    return render(request, 'blog/about.html')
+
 def post_list(request):
     qs = Post.objects.filter(status='p')
     context = {
@@ -103,4 +108,4 @@ def like(request, slug):
     return redirect("blog:detail", slug=slug)
 
 
-       
+
