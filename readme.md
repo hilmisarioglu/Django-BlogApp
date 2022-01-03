@@ -173,7 +173,7 @@ from .utils import get_random_code
 @receiver(pre_save, sender=Post)
 def pre_save_create_slug(sender, instance, **kwargs):
     if not instance.slug:
-        instance.slug = slugify(instance.title + " " + get_random_code())
+        instance.slug = slugify(instance.author.username + ' ' + instance.title)
 a = 'hilmi sarioglu'
 print(slugify(a))
 # hilmi-sarioglu ciktisini verir
@@ -330,6 +330,8 @@ urlpatterns = [
   <div class="col-md-6 offset-md-3">
     <h3>Blog Post</h3>
     <hr />
+
+# multipart/form-data yazmazsak bize hep default resimleri yükler, bizim yükledigimiz fotograflari sergilemez.
     <form method="POST" enctype="multipart/form-data">   
       {% csrf_token %} {{form|crispy}}
       <br />
@@ -340,5 +342,26 @@ urlpatterns = [
 
 {% endblock content %}
 # -------------------------------------------------------------
+# utils.py yaziyoruz
+# uuid bana random harlerden ve rakamlardan bir string üretir
+import uuid
+
+def get_random_code():
+    code = str(uuid.uuid4())[:11].replace("-","")
+    return code
+
+# signals.py i güncelleyebiliriz
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+from django.template.defaultfilters import slugify
+from .models import Post
+from .utils import get_random_code
+
+@receiver(pre_save, sender=Post)
+def pre_save_create_slug(sender, instance, **kwargs):
+    if not instance.slug:
+        instance.slug = slugify(instance.title + " " + get_random_code())
+
+43.50
 
 
