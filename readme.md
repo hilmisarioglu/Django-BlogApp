@@ -362,6 +362,109 @@ def pre_save_create_slug(sender, instance, **kwargs):
     if not instance.slug:
         instance.slug = slugify(instance.title + " " + get_random_code())
 
-43.50
+# -------------------------------------------------------------
+# views yazmaya devam edelim
+# eskiden id tanimliyordum simdi slug field gelecek 
+def post_detail(request, slug):
+    obj = get_object_or_404(Post, slug=slug)
+    context = {
+        'object' : obj,
+    }
+    return render(request, "blog/post_detail.html", context)
 
+# templates/blog/post_detail.html olusturalim. Burda da CommentForm u gösterecegiz.post_list e benzer olacak.
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{object.title}}</h1>
+<img src="{{ object.image.url }}" alt="">
+<p>{{object.content}}</p>
+{% endblock content %}
 
+# urls.py a gidip details i ekle
+urlpatterns = [
+    path("",post_list, name="list"),
+    path("create/",post_create, name="create"),
+    path("<str:slug>/",post_detail, name="detail"),
+]
+
+#  Ben post_list teki title a tikladigimda beni ilgili post_details e yönlendirecek. Bunun icin sunlar yapilir.Öncelikle post_list i güncelle. a tag ini ekle. Title i da a taginin icine koy
+
+{% extends 'base.html' %}
+{% block content %}
+{% for object in object_list %}
+<a href="{% url 'blog:detail' object.slug %}"><h1>{{object.title}}</h1></a>
+<img src="{{object.image.url}}" alt="">
+# 20 karakter göstersin sonuna da 3 nokta koyar
+<p>{{object.content | truncatechars:20}}</p>
+{{ endfor }}
+{% endblock content %}
+
+# -------------------------------------------------------------
+# views i yazmaya devam. update icin bana request gerekiyor. slug gerekiyor. Burda ben yine bir obje alacagim. slug = slug diyecegim. form, objenin icerisi post ise request.POST olacak, yoksa none olacak, yani formun ici bos olacak. Ve ben update ederken file i da aliyorum. Ve bana gelirken icerisinin dolu olmasi icin instance alacagim. instance benim sectigim objeye esit olacak. update sayfasinda ne göstereceksem context e atip gönderiyorum. Yani object ve formu
+
+def post_update(request, slug):
+    obj = get_object_or_404(Post, slug=slug)
+    form = PostForm(request.POST or None, request.FILES or None, instance=obj)
+
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Post updated !!")
+        return redirect("blog:list")
+    context = {
+        "object" : obj,
+        "form" : form
+    }
+    return render(request, "blog/post_update.html", context)
+
+# templates/blog/post_update.html olusturalim.
+{% extends 'base.html' %} 
+{% block content %}
+    <h3>Update {{object.title}}</h3>
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %} 
+      {{form.as_p}}
+      <button type="submit">Update</button>
+    </form>
+{% endblock content %}
+
+# urls.py a gidip update i ekle, yukarida da import etmeyi unutma.
+urlpatterns = [
+    path("",post_list, name="list"),
+    path("create/",post_create, name="create"),
+    path("<str:slug>/",post_detail, name="detail"),
+    path("<str:slug>/update/",post_update, name="update"),
+]
+
+# -------------------------------------------------------------
+# views i yazmaya devam. delete.
+def post_delete(request, slug):
+    obj = get_object_or_404(Post, slug=slug)
+    if request.method == "POST":
+        obj.delete()
+        messages.success(request, "Post deleted !!")
+        return redirect("blog:list")
+    context = {
+        "object" : obj
+    }
+    return render(request, "blog/post_delete.html", context)
+
+# urls.py a gidip delete i ekle, yukarida da import etmeyi unutma.
+urlpatterns = [
+    path("",post_list, name="list"),
+    path("create/",post_create, name="create"),
+    path("<str:slug>/",post_detail, name="detail"),
+    path("<str:slug>/update/",post_update, name="update"),
+    path("<str:slug>/delete/",post_delete, name="delete"),
+]
+# templates/blog/post_delete.html olusturalim. Kullanici cancel a basarsa onu baska bir yere (list e) redirect edecegiz Yes e basarsa silecegiz. 
+{% extends 'base.html' %}
+{% block content %}
+<p>Are you sure you want to delete "{{object}}"?</p>
+<form action=" " method="POST">
+    {% csrf_token %}
+    <a href="{% url 'blog:list' %}">Cancel</a>
+    <button type="submit">Yes</button>
+</form>
+{% endblock %}
+
+    
