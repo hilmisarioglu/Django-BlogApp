@@ -541,4 +541,109 @@ urlpatterns = [
             </div>
         </div>
     </nav>
-</header>    
+</header>
+
+# -------------------------------------------------------------
+
+# blog/static/blog/main.css dosyasi olustur. Django eger html dosyasi icine css yazmayacaksak, baska bir dosya olarak import edeceksek bize bir sart kosuyor. static file. Sonra base.html ye alttaki linki ekle. settings te söyle bir sey de yazmis olabilirdik. STATICFILES_DIRS = BASE_DIR / 'static' o zaman static folderinin altina blog folder i acmaya gerek kalmazdi. 
+<link rel="stylesheet" href="{% static 'blog/main.css' %}">
+
+# base.html dosyasinin en üstüne ise sunu ekle
+{% load static %}
+
+# navbar da base html ye ekli oldugu icin navbara da css kodu yazilabilir. 
+
+body {
+    background-color: #fafafa;
+    color: #333333;
+    margin-top: 5rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: #444444;
+}
+
+ul {
+    margin: 0;
+}
+
+.bg-steel {
+    background-color: #d0f01b;
+}
+
+.site-header .navbar-nav .nav-link {
+    color: #cbd5db;
+}
+.site-header .navbar-nav .nav-hover {
+    color: #ffffff;
+}
+.site-header .navbar-nav .nav-link.active {
+    font-weight: 500;
+}
+
+.content-section {
+    background-color: #ffffff;
+    padding: 10px 20px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-bottom: 20px;
+}
+
+.account-img {
+    height: 110px;
+    width: 110px;
+    margin-right: 20px;
+    margin-bottom: 16px;
+}
+
+.account-heading {
+    font-size: 2.5rem;
+}
+
+# -------------------------------------------------------------
+# bootstrap ile post_list.html düzenle 
+# base.html ye sunu yapistir
+icon linki : https://fontawesome.com/v5.15/icons/comments?style=solid
+<script src="https://kit.fontawesome.com/74c8282b8a.js" crossorigin="anonymous"></script>
+
+# sonra post_list e gel
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h1 style="text-align: center;">Clarusway Blog</h1>
+<div class="row mt-5" >
+    {% for obj in object_list %}
+    <div class="col-4">
+
+        <div class="card shadow p-3 mb-5 bg-white rounded" style="width: 18rem; height: 25rem; ">
+            <img src="{{ obj.image.url }}" class="card-img-top" alt="post_image" style="width:15rem; height: 11rem; align-self:center;">
+            <hr>
+            <div class="card-body">
+                <h5 class="card-title"><a href="{% url 'blog:detail' obj.slug %}">{{obj.title}}</a></h5>
+                <p class="card-text">{{obj.content|truncatechars:20}}</p>
+                
+                <p>
+                    <span><i class="far fa-comment-alt ml-2"></i>{{ obj.comment_count }}</span>
+                    <span><i class="fas fa-eye ml-2"></i>{{ obj.view_count }}</span>
+                    <span><i class="far fa-heart ml-2"></i>{{ obj.like_count }}</span>
+                <p class="card-text"><small>
+
+# su kadar saat önce post edildi demek icin timesince 
+                        Posted {{ obj.publish_date|timesince }} ago.
+                    </small>
+                </p>
+
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {% endfor %}
+</div>
+{% endblock content %}
