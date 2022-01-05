@@ -771,6 +771,8 @@ def like(request, slug):
             {% for comment in object.comments %}
             <div>
                 <p>
+
+# comment in kac saat önce yapildigi yaziyor.
                     <small><b>Comment by {{comment.user}}</b></small> - <small>{{ comment.time_stamp|timesince }} ago.
                     </small>
                 </p>
@@ -792,6 +794,8 @@ def like(request, slug):
         </div>
 
         <div class="m-3">
+
+# her authenticate olan edit update yapamamasi layim , herhangi blogu update delete yapabilmek icin user in ayni yamanda author olmasi gerekir. Bunun icin asagidaki kodu yazdik. 
         {% if user.id == object.author.id %}
         <a href="{% url 'blog:update' object.slug %}" class="btn btn-info">Edit</a>
         <a href="{% url 'blog:delete' object.slug %}" class="btn btn-danger">Delete</a>
@@ -817,4 +821,88 @@ def like(request, slug):
 
 # 
 # ------------------------------------------------------------- 
-54.03
+# her authenticate olan edit update yapamamasi lazim , herhangi blogu update delete yapabilmek icin user in ayni yamanda author olmasi gerekir demistik. Bunun icin yukaridaki kodu yazdik. Fakat bu da yetmez, su an url güvenli degil. Adam url nin sonuna update veya delete yazarak da baskasinin postuna müdahele edebilir. Bunu da engellemek gerekiyor. Bunu biz view de koruyabiliriz. 
+@login_required()
+def post_delete(request, slug):
+    obj = get_object_or_404(Post, slug=slug)
+
+# user ile author esit mi sorgusu
+    if request.user.id != obj.author.id:
+        # return HttpResponse("You are not authorized!")
+        messages.warning(request, "You are not a writer of this post !")
+        return redirect("blog:list")
+    if request.method == "POST":
+        obj.delete()
+        messages.success(request, "Post deleted !!")
+        return redirect("blog:list")
+    
+    context = {
+        "object" : obj
+    }
+    return render(request, "blog/post_delete.html", context)
+    
+# -------------------------------------------------------------
+# crispy-forms yüklemeye geldi sira. Crispy-forms default olarak uni_form ile geliyor, biz bootstrap 4 e cevirecegiz. Form u bootstrape göre düzenliyor. Belki bootstrap5 e cevrilebilir.
+
+# py -m pip install django-crispy-forms ile yükle
+INSTALLED_APPS = [
+ #third_party
+    'crispy_forms',
+]
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+# Installed apps e ekledikten sonra bootstrap4 ayari yapilir.post_create i güncelleyecegiz.Asagidaki gibi.Formun fieldini kücültmek icin div icine al sonra onu kücült.Veya widgetlar ile yapilir.https://docs.djangoproject.com/en/4.0/ref/forms/widgets/
+{% load crispy_forms_tags %}
+    <form method="POST" enctype="multipart/form-data">   
+      {% csrf_token %} {{form|crispy}}
+      <br />
+      <button type="submit" class="btn btn-outline-info">Post</button>
+    </form>
+
+pip freeze > ./requirements.txt
+
+# 3rd part app ler belli bir grup tarafindan mesela django restframeworkü iyilestirmek icin disaridan yazilan paketler.pillow pythonun icinde olan bir kütürhane bunu import etmeye gerek yok.  
+# -------------------------------------------------------------
+# update.html 
+{% extends 'base.html' %} {% load crispy_forms_tags %} {% block content %}
+<div class="row">
+  <div class="col-md-6 offset-md-3">
+    <h3>Update Post</h3>
+    <hr />
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %} {{form|crispy}}
+      <br />
+      <button type="submit" class="btn btn-outline-info">Update</button>
+    </form>
+  </div>
+</div>
+
+{% endblock content %}
+# -------------------------------------------------------------
+# delete.html
+
+{% extends 'base.html' %} {% load static %} {% block content %}
+
+<div class="row mt-5">
+  <div class="col-md-6">
+    <div class="card card-body">
+      <p>Are you sure you want to delete "{{object}}"?</p>
+
+      <form action=" " method="POST">
+        {% csrf_token %}
+        <a class="btn btn-warning" href="{% url 'blog:list' %}">Cancel</a>
+        <input class="btn btn-danger" type="submit" name="Confirm" />
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+# -------------------------------------------------------------
+# USER APPLICATION
+# user üzerinden profile modelini olusturalim, profile page icin formu olusturalim. Yeni bir app olusturuyoruz.
+# py manage.py startapp users 
+
+    
+
+    
