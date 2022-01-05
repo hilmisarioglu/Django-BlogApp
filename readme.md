@@ -902,7 +902,70 @@ pip freeze > ./requirements.txt
 # USER APPLICATION
 # user üzerinden profile modelini olusturalim, profile page icin formu olusturalim. Yeni bir app olusturuyoruz.
 # py manage.py startapp users 
+INSTALLED_APPS = [
+    'users',
+]
+# hata alirsak su seklide de app eklenebilir
+    # 'blog.apps.BlogConfig',
+    # 'users.apps.UsersConfig',
 
+# Bir user in bir profile i olmasi gerekiyor. Birden fazla profile i olamaz. one to one relation olmasi lazim. 
+
+# models.py
+from django.db import models
+from django.contrib.auth.models import User
+
+# upload icin alttaki fonksiyonu yazdik. Düzenli bir sekilde kaydetsin diye. Kullanicidan alinan bütün resimler veya videolar benim media_root un altina otomatik olarak gidecek. Django settingste belirledigimiz icin MEDIA_ROOT = BASE_DIR / "media_root" , otomatik bu klaör altina kaydedilir. Ama bu klasörün altinda bütün resimleri kimin yükledigi belli olmadan kaydedemem.Bundan dolayi blogtan gelen resimleri otomatik olarak blog altina user dan gelen resimleri user altina kaydeder. Blog ve User klasörlerini kendi olusturur. Ve id lere göre klasör olusturur ve id ler altina resimleri kaydeder.  
+def user_profile_path(instance, filename):
+    return 'user/{0}/{1}'.format(instance.user.id, filename)
+# {0} id yi {1} ise dosya ismini ifade ediyor.
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to= user_profile_path, default="avatar.png")
+    bio = models.TextField(blank=True)
+
+    def __str__(self):
+        return "{} {}".format(self.user, 'Profile')    
+
+python manage.py makemigrations
+python manage.py migrate
+
+# admin panele kaydet
+from django.contrib import admin
+from .models import Profile
+
+admin.site.register(Profile)
+
+# User register oldugu zaman otomatik olarak profile i da olsun istiyorum. Gidip bir de profil yazmak istemiyorum. signals ne yapiyordu, post_save , pre_save , post_delete , pre_delete yapiyordu. Simdi sunu diyorum user olusturduktan sonra bir signal gönder ve profile i olustursun.
+
+# signals.py
+# post_save i import ettim
+from django.db.models.signals import post_save
+# user i import ettim
+from django.contrib.auth.models import User
+# reciver import etmem gerekiyor
+from django.dispatch import receiver
+# prifle modeline de ihtiyacim olacak
+from .models import Profile
+
+# iki parametre alir. hangi method ve sender ne ? created demek user create edildiyse demek. **kwargs yazmak zorundasin cünkü django otomatik bazi seyleri kendisi koyuyor. Onlari karsilamak icin **kwargs koyuluyor.Normal bir sayfaya üye oldugumuz zaman bizim profile page i miz otomatik olarak gelir. Siz o profile sayfasina resim yüklersiniz. Ne eklnecekse onlar eklenir. Signals burada devreye giriyor. 
+@receiver(post_save, sender=User)
+def create_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.create(user=instance) 
+
+# apps.py i da güncelle signals den sonra
+from django.apps import AppConfig
+
+
+class UsersConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'users'
+    
+    def ready(self):
+        import users.signals
     
 
-    
+# -------------------------------------------------------------
