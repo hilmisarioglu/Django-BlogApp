@@ -709,7 +709,7 @@ def like(request, slug):
             Like.objects.create(user=request.user, post=obj)
         return redirect("blog:detail", slug=slug)
     return redirect("blog:detail", slug=slug)
-# Like butonuna tekrar basarsam silinsin istiyorum. Bir de sunu kontrol edecegim, bu postun like i benim tarafimdan verilmis mi verilmemis mi? Eger daha önce verilmisse like i bir azaltack ilk defa verilmisse 1 artiracak. Yani bir kullanici sadece bir defa like verebilecek. 10 defa veremeyecek. 
+# Like butonuna tekrar basarsam silinsin istiyorum. Bir de sunu kontrol edecegim, bu postun like i benim tarafimdan verilmis mi verilmemis mi? Eger daha önce verilmisse like i bir azaltack ilk defa verilmisse 1 artiracak. Yani bir kullanici sadece bir defa like verebilecek. 10 defa veremeyecek. Bu arada lie butonuna bastigimizda tüm sayfayi yenilemesin istiyorsak ajax komutu kullanilabilir.
 
 # urls.py da like icin url belirleyelim
     path("<str:slug>/like/",like, name="like"),
@@ -967,5 +967,113 @@ class UsersConfig(AppConfig):
     def ready(self):
         import users.signals
     
-
+ 
 # -------------------------------------------------------------
+# ana urls.py dan yol verdim
+urlpatterns = [
+    path('users/', include('users.urls')),
+]
+
+# simdi users icindeki url ye gidelim.
+# accounts/login/ [name='login']
+# accounts/logout/ [name='logout']
+# accounts/password_change/ [name='password_change']
+# accounts/password_change/done/ [name='password_change_done']
+# accounts/password_reset/ [name='password_reset']
+# accounts/password_reset/done/ [name='password_reset_done']
+# accounts/reset/<uidb64>/<token>/ [name='password_reset_confirm']
+# accounts/reset/done/ [name='password_reset_complete']
+# Yukarudaki name leri bu sekilde yazmamiz gerekiyor. 
+# https://docs.djangoproject.com/en/4.0/topics/auth/default/
+
+from django.urls import path
+from django.contrib.auth import views as auth_views
+
+urlpatterns = [
+
+# django bana default olarak bu view i verdi. as_view eklemek gerekiyor.name kesinlikle login olmak zorunda. template_name i user altina yönlendirmemiz gerekiyor.
+    path("login/", auth_views.LoginView.as_view(template_name="users/login.html"), name="login"),
+]
+# simdi forms.py yazalim. Django bana default olarak UserCreationForm veriyor. django/auth/forms.py altinda. Bu formda username , pass1 ve pass2 var. Ben buna e-mail ekleyecegim. Sifremi unuttum a tiklayinca e maile mesaj gidecek böyle oldugu icin email i benim zorunlu girilebilir ve uniq bir deger haline getirmem lazim. User register olurken e maili de girmesi gereksin.
+from django import forms
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
+
+# UserCreationForm dan import ettim yani bütün özelliklerini inherit ettim. 
+class RegistrationForm(UserCreationForm):
+    email = forms.EmailField()  #override ettik. boş bırakınca default required true oldu
+    
+    class Meta:
+        model = User
+# UserCreationForm da password vardi ben User modelimden e maili ve username i aldim.
+        fields = ("username", "email")
+        
+# Form dan emaili cektk, daha önce db de var mi baktik.cleaned_data bu ise yarar.Djangoda bir field e cuntom validation yapacaksak clean_ yazip field ismi yazilir. 
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Please use another Email, that one already taken")
+        return email
+    
+# örnegin burada custom validation yaptk. Ismin icinde a varsa uyar kabul etme dedik.
+    # def clean_first_name(self):
+    #     name = self.cleaned_data("first_name")
+    #     if "a" in name:
+    #         raise forms.ValidationError("Your name includes A")
+    #     return name
+        
+# Simdi views e ekleyelim.
+from django.shortcuts import render, redirect
+from .forms import RegistrationForm
+from django.contrib import messages
+
+def register(request):
+    form = RegistrationForm(request.POST or None) 
+    if request.user.is_authenticated:
+        messages.warning(request, "You are already have an account!")
+        return redirect("blog:list")
+    if form.is_valid():
+        form.save()
+        name = form.cleaned_data["username"]
+        messages.success(request, f"Account created for {name}")
+        return redirect("login")  
+                
+    context = {
+        "form" : form
+    }
+    return render(request, "users/register.html", context)
+
+# hemen bir templates acalim ve altina register.html acalim. 
+{% extends 'base.html' %} {% block title %}Register{% endblock %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="content-section">
+    <form action="" method="post">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">Join Today</legend>
+            {{ form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Sign Up</button>
+        </div>
+    </form>
+    <div class="border-top pt-3">
+        <small class="text-muted">
+            Already have an account?<a class="ml-2" href="{% url 'login'  %}">Sign In</a>
+        </small>
+    </div>
+
+</div>
+{% endblock %}
+# urls e ekleyelim
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from .views import register
+
+urlpatterns = [
+    path("register/", register, name="register"),
+]
+
+# navbara register urlsini eklemeyi unutma.
+ <a class="nav-item nav-link" href="{% url 'register' %}">Register</a>

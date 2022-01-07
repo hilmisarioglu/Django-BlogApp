@@ -8,8 +8,10 @@
             <legend class="border-bottom mb-4">Login</legend>
             {{ form|crispy }}
         </fieldset>
-        <div class="form-group">
-            <button class="btn btn-outline-info" type="submit">Login</button>
+        
+        <div class="form-group mt-2">
+            <button class="btn btn-outline-info " type="submit">Login</button>
+
             <small class="text-muted ml-2">
                 <a href="{% url 'password_reset' %}">Forgot Password?</a>
             </small>
