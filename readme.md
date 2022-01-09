@@ -947,7 +947,7 @@ from django.db.models.signals import post_save
 from django.contrib.auth.models import User
 # reciver import etmem gerekiyor
 from django.dispatch import receiver
-# prifle modeline de ihtiyacim olacak
+# profile modeline de ihtiyacim olacak
 from .models import Profile
 
 # iki parametre alir. hangi method ve sender ne ? created demek user create edildiyse demek. **kwargs yazmak zorundasin cünkü django otomatik bazi seyleri kendisi koyuyor. Onlari karsilamak icin **kwargs koyuluyor.Normal bir sayfaya üye oldugumuz zaman bizim profile page i miz otomatik olarak gelir. Siz o profile sayfasina resim yüklersiniz. Ne eklnecekse onlar eklenir. Signals burada devreye giriyor. 
@@ -986,13 +986,14 @@ urlpatterns = [
 # Yukarudaki name leri bu sekilde yazmamiz gerekiyor. 
 # https://docs.djangoproject.com/en/4.0/topics/auth/default/
 
+# REGISTER
 from django.urls import path
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
 
-# django bana default olarak bu view i verdi. as_view eklemek gerekiyor.name kesinlikle login olmak zorunda. template_name i user altina yönlendirmemiz gerekiyor.
-    path("login/", auth_views.LoginView.as_view(template_name="users/login.html"), name="login"),
+# django bana default olarak bu view i verdi. as_view eklemek gerekiyor.name kesinlikle register olmak zorunda. template_name i user altina yönlendirmemiz gerekiyor.
+    path("register/", register, name="register"),
 ]
 # simdi forms.py yazalim. Django bana default olarak UserCreationForm veriyor. django/auth/forms.py altinda. Bu formda username , pass1 ve pass2 var. Ben buna e-mail ekleyecegim. Sifremi unuttum a tiklayinca e maile mesaj gidecek böyle oldugu icin email i benim zorunlu girilebilir ve uniq bir deger haline getirmem lazim. User register olurken e maili de girmesi gereksin.
 from django import forms
@@ -1015,7 +1016,7 @@ class RegistrationForm(UserCreationForm):
             raise forms.ValidationError("Please use another Email, that one already taken")
         return email
     
-# örnegin burada custom validation yaptk. Ismin icinde a varsa uyar kabul etme dedik.
+# örnegin burada custom validation yaptik. Ismin icinde a varsa uyar kabul etme dedik.
     # def clean_first_name(self):
     #     name = self.cleaned_data("first_name")
     #     if "a" in name:
@@ -1077,3 +1078,270 @@ urlpatterns = [
 
 # navbara register urlsini eklemeyi unutma.
  <a class="nav-item nav-link" href="{% url 'register' %}">Register</a>
+
+# Formsu güncelleyelim. Forms a email alani ekleyelim.
+from django import forms
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm, PasswordResetForm
+from django.forms import fields
+from .models import Profile
+
+
+class RegistrationForm(UserCreationForm):
+    email = forms.EmailField()  #override ettik. boş bırakınca default required true oldu
+    
+    class Meta:
+        model = User
+        fields = ("username", "email")
+        
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Please use another Email, that one already taken")
+        return email
+    
+    # def clean_first_name(self):
+    #     name = self.cleaned_data("first_name")
+    #     if "a" in name:
+    #         raise forms.ValidationError("Your name includes A")
+    #     return name
+
+# PROFILE 
+# Asagida iki form u birlestirdik.ProfileUpdateForm ve UserUpdateForm. Bunlari views de profile_page icin kullanacagim.
+class ProfileUpdateForm(forms.ModelForm):
+    
+    class Meta:
+        model = Profile
+        fields = ("image", "bio")
+
+class UserUpdateForm(forms.ModelForm):
+    
+    class Meta:
+        model = User
+        fields = ("username", "email")
+
+# views e gel
+def profile(request):
+    u_form = UserUpdateForm(request.POST or None, instance=request.user)
+    p_form = ProfileUpdateForm(request.POST or None, instance=request.user.profile, files=request.FILES)
+    
+    if u_form.is_valid() and p_form.is_valid():
+        u_form.save()
+        p_form.save()
+        messages.success(request, "Your profile has been updated!")
+        return redirect(request.path)
+    
+    context = {
+        "u_form" : u_form,
+        "p_form" : p_form    
+    }
+    return render(request, "users/profile.html", context)
+# profile.html olustur. 
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="content-section">
+    <div class="media">
+        <img class="rounded-circle account-img" src="{{ user.profile.image.url }}">
+        <div class="media-body">
+            <h2 class="account-heading">{{ user.username }}</h2>
+            <p class="text-secondary">{{ user.email }}</p>
+        </div>
+    </div>
+    <form action="" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">Profile</legend>
+            {{ u_form|crispy }}
+            {{ p_form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Update</button>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+# urls e ekle 
+    path("profile/", profile, name="profile"),
+# navbara da ekle 
+        <a class="nav-item nav-link" href="{% url 'profile' %}">Profile</a>
+
+# LOGIN 
+# urls e login yaz.
+    path("login/", auth_views.LoginView.as_view(template_name="users/login.html"), name="login"),
+
+# django default olarak bir login.html veriyor. ama bu template_name = 'registrtion/login.html' . Bizim registration diye appimiz olmadigi icin biz burayi düzenleyecegiz. urls in icinde template_name="users/login.html" ifadeyi yazdik.
+
+# login.html olusturalim 
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="content-section">
+    <div class="media">
+        <img class="rounded-circle account-img" src="{{ user.profile.image.url }}">
+        <div class="media-body">
+            <h2 class="account-heading">{{ user.username }}</h2>
+            <p class="text-secondary">{{ user.email }}</p>
+        </div>
+    </div>
+    <form action="" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">Profile</legend>
+            {{ u_form|crispy }}
+            {{ p_form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Update</button>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+# Navbara login i bagla
+        <a class="nav-item nav-link" href="{% url 'login' %}">Login</a>
+
+# Login icin son asama. default olarak baska bir adrese redirect eder. Ayarlara gel ve asagidaki kodu yaz.
+LOGIN_REDIRECT_URL = "blog:list"
+LOGIN_URL = "login"
+
+
+# LOGOUT
+# logout html de cok bir sey yazmamiza gerek yok django cogu seyi kendi yapiyor.
+# logout.html
+{% extends 'base.html' %} {% block title %}login{% endblock %}
+{% block content %}
+<h2>You have been logged out</h2>
+<div class="border-top pt-3">
+    <small class="text-muted">
+        <a href="{% url 'login' %}">Log in Again</a>
+    </small>
+</div>
+
+{% endblock %}
+
+# normalde logout.vies yazilabilir ama gerek yok 
+# urls e ekle 
+    path("logout/", auth_views.LogoutView.as_view(template_name="users/logout.html"), name="logout"),
+
+# djangoda login olmadan da create yapmayi engellemek icin views e gelip @login_required() koyulur, bunlara decorater denir.
+
+# base.url ye messages ekle. her sayfaya tek tek eklemek yerine sadece base e ekle.
+      <div class="container">
+        {% if messages %}
+        {% for message in messages %}
+
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+
+        {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+# user coktan login olduysa register sayfasina ulassin istemiyorum. Normalde navbarda bunu ayarlamistim. Fakat manuel olarak register yazarsam arama cubuguna bu beni yine de register sayfasina yönlendiriyor. Bunu engellemem lazim. views e sunu ekle.
+if request.user.is_authenticated:
+        messages.warning(request, "You are already have an account!")
+        return redirect("blog:list")
+# Bu da account olusturulmussa gönderilecek mesaj 
+    if form.is_valid():
+        form.save()
+        name = form.cleaned_data["username"]
+        messages.success(request, f"Account created for {name}")
+        return redirect("login")  
+# Profil update edilmissi 
+if u_form.is_valid() and p_form.is_valid():
+        u_form.save()
+        p_form.save()
+        messages.success(request, "Your profile has been updated!")
+        return redirect(request.path)
+
+# PASSWORD RESET EMAIL
+# urls e ekleyerek basla
+    path("password-reset/", auth_views.PasswordResetView.as_view(template_name="users/password_reset_email.html", form_class=PasswordResetEmailCheck), name="password_reset"),
+
+# password_reset_email.html olustur 
+{% extends 'base.html' %} {% block title %}login{% endblock %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="content-section">
+    <form action="" method="post">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">Reset Password</legend>
+            {{ form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Request Reset</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+# PASSWORD RESET DONE
+# urls e ekle 
+PasswordResetDoneView.as_view(template_name="users/password_reset_done.html"), name="password_reset_done"),
+# password_reset_done.html olustur 
+{% extends 'base.html' %} {% block title %}login{% endblock %}
+{% block content %}
+<div class="alert alert-info">
+    <p>We’ve emailed you instructions for setting your password, if an account exists with the email you entered. You
+        should receive them shortly.</p>
+
+    <p>If you don’t receive an email, please make sure you’ve entered the address you registered with, and check your
+        spam folder.</p>
+</div>
+
+{% endblock %}
+
+# PASSWORD RESET CONFIRM DONE 
+# urls e ekle 
+    path("password-reset-confirm/<uuidb64>/<token>", auth_views.PasswordResetConfirmView.as_view(template_name="users/password_reset_confirm.html"), name="password_reset_confirm"),
+
+# password_reset_confirm.html olustur
+{% extends 'base.html' %} {% block title %}login{% endblock %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="content-section">
+    <form action="" method="POST">
+        {% csrf_token %}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">Reset Password</legend>
+            {{ form|crispy }}
+        </fieldset>
+        <div class="form-group">
+            <button class="btn btn-outline-info" type="submit">Reset Password</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+# PASSWORD RESET COMPLETE
+# urls yaz ekle
+    path("password-reset-complete/", auth_views.PasswordResetCompleteView.as_view(template_name="users/password_reset_complete.html"), name="password_reset_complete"),
+
+# password_reset_complete.html olustur
+{% extends 'base.html' %} {% block title %}login{% endblock %}
+{% block content %}
+<div class="alert alert-info">
+    Your password has been set successfully!
+</div>
+<a href="{% url 'login' %}">Sign In Here</a>
+
+{% endblock %}
+
+# SETTINGS . gmail e git denemek icin sunu yap. Google Hesabinizi Yönetin > Güvenlik > Daha az güvenli uygulamaya erisim diye bir yer var. Onu acik yap.
+#Sending email (gmail ayarlardan uygulamaya izin ver!)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config("EMAIL_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_PASSWORD")
+
+1.49

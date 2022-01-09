@@ -6,6 +6,7 @@ from django.contrib import messages
 
 def homepage(request):
     return render(request, 'blog/homepage.html')
+
 def about(request):
     return render(request, 'blog/about.html')
 
